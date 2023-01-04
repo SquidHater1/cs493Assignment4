@@ -1,0 +1,60 @@
+services:
+  db:
+    image: mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB_NAME}
+  
+  rabbit:
+    image: rabbitmq:management
+    ports:
+      - 5672:5672
+      - 15672:15672
+    environment:
+      RABBITMQ_HOST: rabbit
+
+  db-init:
+    build: .
+    environment:
+      MONGO_HOST: db
+      MONGO_USER: ${MONGO_ROOT_USER}
+      MONGO_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_DB_NAME: ${MONGO_DB_NAME}
+      MONGO_AUTH_DB_NAME: admin
+      MONGO_CREATE_USER: ${MONGO_USER}
+      MONGO_CREATE_PASSWORD: ${MONGO_PASSWORD}
+    depends_on:
+      - db
+    restart: on-failure
+    command: npm run initdb
+
+  api:
+    build: .
+    ports:
+      - 8000:8000
+    environment:
+      MONGO_HOST: db
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_DB_NAME: ${MONGO_DB_NAME}
+      RABBITMQ_HOST: rabbit
+    depends_on:
+      - db
+      - db-init
+    restart: on-failure
+
+  consumer:
+    build: .
+    environment:
+      MONGO_HOST: db
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_DB_NAME: ${MONGO_DB_NAME}
+      RABBITMQ_HOST: rabbit
+    depends_on:
+      - db
+      - db-init
+      - rabbit
+    restart: on-failure
+    command: npm run consumer
